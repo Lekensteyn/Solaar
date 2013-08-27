@@ -270,11 +270,12 @@ class FeaturesArray(object):
 
 class KeysArray(object):
 	"""A sequence of key mappings supported by a HID++ 2.0 device."""
-	__slots__ = ('device', 'keys')
+	__slots__ = ('device', 'keys', 'featureId')
 
-	def __init__(self, device, count):
+	def __init__(self, device, featureId, count):
 		assert device is not None
 		self.device = device
+		self.featureId = featureId
 		self.keys = [None] * count
 
 	def __getitem__(self, index):
@@ -283,7 +284,7 @@ class KeysArray(object):
 				raise IndexError(index)
 
 			if self.keys[index] is None:
-				keydata = feature_request(self.device, FEATURE.REPROG_CONTROLS, 0x10, index)
+				keydata = feature_request(self.device, self.featureId, 0x10, index)
 				if keydata:
 					key, key_task, flags = _unpack('!HHB', keydata[:5])
 					ctrl_id_text = special_keys.CONTROL[key]
@@ -409,9 +410,15 @@ def get_battery(device):
 
 
 def get_keys(device):
-	count = feature_request(device, FEATURE.REPROG_CONTROLS)
+	reprog_feats = (FEATURE.REPROG_CONTROLS_V2,
+			FEATURE.REPROG_CONTROLS_V3,
+			FEATURE.REPROG_CONTROLS)
+	for featureId in reprog_feats:
+		count = feature_request(device, featureId)
+		if count:
+			break
 	if count:
-		return KeysArray(device, ord(count[:1]))
+		return KeysArray(device, featureId, ord(count[:1]))
 
 
 def get_mouse_pointer_info(device):
